@@ -1,0 +1,64 @@
+# ---- Dependencies ----
+node_modules/
+.pnp
+.pnp.js
+.yarn/install-state.gz
+
+# ---- Environment variables ----
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+*.env
+!.env.example
+!.env.local.example
+
+# ---- Next.js (frontend) ----
+frontend/.next/
+frontend/out/
+frontend/build/
+frontend/next-env.d.ts
+frontend/.vercel
+frontend/tsconfig.tsbuildinfo
+*.tsbuildinfo
+
+# ---- NestJS / Node (backend) ----
+backend/dist/
+backend/build/
+
+# ---- Testing / coverage ----
+coverage/
+.nyc_output/
+
+# ---- SWC / build caches ----
+.swc/
+frontend/.swc/
+
+# ---- Logs ----
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# ---- OS files ----
+.DS_Store
+Thumbs.db
+
+# ---- Editor / IDE ----
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# ---- Docker ----
+docker-compose.override.yml
+
+# ---- Misc ----
+*.pid
+*.seed
+*.pid.lock
+.eslintcache
