@@ -1,0 +1,45 @@
+name: Deploy Clipboard Cloud
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    name: Build and Deploy
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: SSH into VPS, build and restart both apps
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: ${{ secrets.VPS_PORT }}
+          script: |
+            set -e
+            echo "=== Pulling latest code ==="
+            cd /home/prahlad/clipboard-cloud
+            git pull origin main
+
+            echo "=== Building backend ==="
+            cd /home/prahlad/clipboard-cloud/backend
+            npm install
+            npm run build
+
+            echo "=== Building frontend ==="
+            cd /home/prahlad/clipboard-cloud/frontend
+            npm install
+            npm run build
+
+            echo "=== Reloading PM2 processes ==="
+            pm2 reload clipboard-api --update-env
+            pm2 reload clipboard-frontend --update-env
+
+            echo "=== Reloading Nginx ==="
+            sudo systemctl reload nginx
+
+            echo "=== Deploy status ==="
+            pm2 status

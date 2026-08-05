@@ -2,7 +2,7 @@ module.exports = {
   apps: [
     {
       name: 'clipboard-api',
-      script: 'dist/main.js',
+      script: 'dist/src/main.js',
       cwd: '/home/prahlad/clipboard-cloud/backend',
       instances: 1,
       autorestart: true,
