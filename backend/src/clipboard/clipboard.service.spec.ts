@@ -46,11 +46,35 @@ describe('ClipboardService', () => {
     expect(pinnedItem?.pinned).toBe(true);
   });
 
-  it('deletes an item by id', async () => {
+  it('deletes an item by id when requested by the host', async () => {
     const item = await service.addItem(sessionId, textItem('to delete'));
-    await service.deleteItem(sessionId, item.id);
+    await service.deleteItem(sessionId, item.id, 'host-socket', true);
     const history = await service.getHistory(sessionId);
     expect(history.find((i) => i.id === item.id)).toBeUndefined();
+  });
+
+  it('allows the original sender to delete their own item', async () => {
+    const item = await service.addItem(
+      sessionId,
+      textItem('mine'),
+      'sender-socket',
+    );
+    await service.deleteItem(sessionId, item.id, 'sender-socket', false);
+    const history = await service.getHistory(sessionId);
+    expect(history.find((i) => i.id === item.id)).toBeUndefined();
+  });
+
+  it('rejects deletion from a non-host device that did not send the item', async () => {
+    const item = await service.addItem(
+      sessionId,
+      textItem('not yours'),
+      'sender-socket',
+    );
+    await expect(
+      service.deleteItem(sessionId, item.id, 'other-socket', false),
+    ).rejects.toThrow();
+    const history = await service.getHistory(sessionId);
+    expect(history.find((i) => i.id === item.id)).toBeDefined();
   });
 
   it('searches history by content substring', async () => {
