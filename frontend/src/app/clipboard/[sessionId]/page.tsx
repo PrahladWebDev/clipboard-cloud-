@@ -386,6 +386,8 @@ export default function ClipboardSessionPage() {
           items={items}
           sessionId={sessionId}
           encryptionKey={encryptionKey}
+          mySocketId={mySocketId}
+          isHost={!!devices.find((d) => d.socketId === mySocketId)?.isHost}
           onPin={(id, pinned) => getSocket().emit('clipboard:pin', { sessionId, itemId: id, pinned })}
           onDelete={(id) => getSocket().emit('clipboard:delete', { sessionId, itemId: id })}
         />
