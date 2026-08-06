@@ -14,6 +14,7 @@ export class ClipboardService {
   async addItem(
     sessionId: string,
     dto: PushClipboardItemDto,
+    senderSocketId?: string,
   ): Promise<ClipboardItem> {
     const item: ClipboardItem = {
       id: uuidv4(),
@@ -27,6 +28,7 @@ export class ClipboardService {
       description: dto.description,
       pinned: false,
       createdAt: Date.now(),
+      senderSocketId,
     };
 
     // Pinned items must survive the capped-length trim, so we re-implement
@@ -71,8 +73,24 @@ export class ClipboardService {
     return updated;
   }
 
-  async deleteItem(sessionId: string, itemId: string): Promise<ClipboardItem[]> {
+  async deleteItem(
+    sessionId: string,
+    itemId: string,
+    requesterSocketId: string,
+    requesterIsHost: boolean,
+  ): Promise<ClipboardItem[]> {
     const list = await this.getHistory(sessionId);
+    const target = list.find((i) => i.id === itemId);
+    if (!target) return list;
+
+    // Only the device that sent an item, or the host device, may delete it.
+    // A guest device shouldn't be able to remove content another device shared.
+    const canDelete =
+      requesterIsHost || target.senderSocketId === requesterSocketId;
+    if (!canDelete) {
+      throw new Error('Only the sender or the host device can delete this item.');
+    }
+
     const updated = list.filter((i) => i.id !== itemId);
     await this.redis.listReplace(
       historyKey(sessionId),
