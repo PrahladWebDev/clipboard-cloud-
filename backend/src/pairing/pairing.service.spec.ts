@@ -33,7 +33,7 @@ describe('PairingService', () => {
     expect(record.devices).toBe(2);
   });
 
-  it('throws NotFoundException for an expired/unknown sessionId', async () => {
+  it('throws NotFoundException for an unknown sessionId', async () => {
     await expect(service.getSession('does-not-exist')).rejects.toThrow(NotFoundException);
   });
 });
