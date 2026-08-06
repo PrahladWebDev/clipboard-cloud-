@@ -3,8 +3,8 @@ import Redis from 'ioredis';
 
 /**
  * Thin wrapper around ioredis that is used for:
- *  - pairing session storage (6-digit code -> sessionId, TTL based expiry)
- *  - clipboard history (Redis lists, capped + TTL for auto-delete)
+ *  - pairing session storage (6-digit code -> sessionId)
+ *  - clipboard history (Redis lists, capped by length)
  *
  * If Redis is not reachable (e.g. running the demo locally without infra),
  * this service transparently falls back to an in-memory store so the app
@@ -20,7 +20,6 @@ export class RedisService implements OnModuleDestroy {
   // in-memory fallback store
   private mem = new Map<string, string>();
   private memLists = new Map<string, string[]>();
-  private memExpiry = new Map<string, NodeJS.Timeout>();
 
   constructor() {
     try {
@@ -88,27 +87,13 @@ export class RedisService implements OnModuleDestroy {
     }
   }
 
-  private clearMemExpiry(key: string) {
-    const t = this.memExpiry.get(key);
-    if (t) clearTimeout(t);
-    this.memExpiry.delete(key);
-  }
-
-  async set(key: string, value: string, ttlSeconds?: number): Promise<void> {
+  async set(key: string, value: string): Promise<void> {
     await this.withFallback(
       async () => {
-        if (ttlSeconds) await this.client.set(key, value, 'EX', Math.max(Math.ceil(ttlSeconds), 1));
-        else await this.client.set(key, value);
+        await this.client.set(key, value);
       },
       () => {
         this.mem.set(key, value);
-        this.clearMemExpiry(key);
-        if (ttlSeconds) {
-          this.memExpiry.set(
-            key,
-            setTimeout(() => this.mem.delete(key), ttlSeconds * 1000),
-          );
-        }
       },
     );
   }
@@ -128,55 +113,27 @@ export class RedisService implements OnModuleDestroy {
       () => {
         this.mem.delete(key);
         this.memLists.delete(key);
-        this.clearMemExpiry(key);
       },
     );
   }
 
-  async expire(key: string, ttlSeconds: number): Promise<void> {
-    await this.withFallback(
-      async () => {
-        await this.client.expire(key, Math.max(Math.ceil(ttlSeconds), 1));
-      },
-      () => {
-        this.clearMemExpiry(key);
-        this.memExpiry.set(
-          key,
-          setTimeout(() => {
-            this.mem.delete(key);
-            this.memLists.delete(key);
-          }, ttlSeconds * 1000),
-        );
-      },
-    );
-  }
-
-  /** Push a JSON item onto the head of a list, trim to maxLength, refresh TTL. */
+  /** Push a JSON item onto the head of a list, trim to maxLength. */
   async listPushCapped(
     key: string,
     item: string,
     maxLength: number,
-    ttlSeconds?: number,
   ): Promise<void> {
     await this.withFallback(
       async () => {
         const pipeline = this.client.pipeline();
         pipeline.lpush(key, item);
         pipeline.ltrim(key, 0, maxLength - 1);
-        if (ttlSeconds) pipeline.expire(key, Math.max(Math.ceil(ttlSeconds), 1));
         await pipeline.exec();
       },
       () => {
         const list = this.memLists.get(key) ?? [];
         list.unshift(item);
         this.memLists.set(key, list.slice(0, maxLength));
-        if (ttlSeconds) {
-          this.clearMemExpiry(key);
-          this.memExpiry.set(
-            key,
-            setTimeout(() => this.memLists.delete(key), ttlSeconds * 1000),
-          );
-        }
       },
     );
   }
@@ -188,24 +145,16 @@ export class RedisService implements OnModuleDestroy {
     );
   }
 
-  async listReplace(key: string, items: string[], ttlSeconds?: number) {
+  async listReplace(key: string, items: string[]) {
     await this.withFallback(
       async () => {
         const pipeline = this.client.pipeline();
         pipeline.del(key);
         if (items.length) pipeline.rpush(key, ...items);
-        if (ttlSeconds) pipeline.expire(key, Math.max(Math.ceil(ttlSeconds), 1));
         await pipeline.exec();
       },
       () => {
         this.memLists.set(key, items);
-        if (ttlSeconds) {
-          this.clearMemExpiry(key);
-          this.memExpiry.set(
-            key,
-            setTimeout(() => this.memLists.delete(key), ttlSeconds * 1000),
-          );
-        }
       },
     );
   }
