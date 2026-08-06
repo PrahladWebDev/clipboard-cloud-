@@ -24,6 +24,7 @@ interface DeviceInfo {
   socketId: string;
   deviceLabel: string;
   joinedAt: number;
+  isHost: boolean;
 }
 
 @WebSocketGateway({
@@ -39,6 +40,10 @@ export class ClipboardGateway
   private socketSessions = new Map<string, string>();
   // sessionId -> (socketId -> DeviceInfo), for the device list UI
   private roomDevices = new Map<string, Map<string, DeviceInfo>>();
+  // sessionId -> socketId of the device that generated/created the session
+  // (the first device to join the room). Used to label devices as
+  // "Host" (generated) vs "Joined" in the UI.
+  private roomHost = new Map<string, string>();
 
   constructor(
     private readonly clipboardService: ClipboardService,
@@ -65,9 +70,21 @@ export class ClipboardGateway
   }
 
   private removeDevice(sessionId: string, socketId: string) {
-    this.roomDevices.get(sessionId)?.delete(socketId);
-    if (this.roomDevices.get(sessionId)?.size === 0) {
+    const room = this.roomDevices.get(sessionId);
+    room?.delete(socketId);
+
+    if (!room || room.size === 0) {
       this.roomDevices.delete(sessionId);
+      this.roomHost.delete(sessionId);
+      return;
+    }
+
+    // If the host device left, hand the "Host" label to whichever
+    // remaining device joined earliest, so the badge doesn't just vanish.
+    if (this.roomHost.get(sessionId) === socketId) {
+      const next = Array.from(room.values()).sort((a, b) => a.joinedAt - b.joinedAt)[0];
+      this.roomHost.set(sessionId, next.socketId);
+      room.forEach((d) => (d.isHost = d.socketId === next.socketId));
     }
   }
 
@@ -90,10 +107,19 @@ export class ClipboardGateway
     if (!this.roomDevices.has(sessionId)) {
       this.roomDevices.set(sessionId, new Map());
     }
+
+    // The first device to join a room is the one that generated the
+    // session (it creates the session via REST, then immediately joins).
+    // Every later joiner is a "guest" that scanned/entered the code.
+    if (!this.roomHost.has(sessionId)) {
+      this.roomHost.set(sessionId, client.id);
+    }
+
     this.roomDevices.get(sessionId).set(client.id, {
       socketId: client.id,
       deviceLabel: deviceLabel || 'Unknown device',
       joinedAt: Date.now(),
+      isHost: this.roomHost.get(sessionId) === client.id,
     });
 
     const history = await this.clipboardService.getHistory(sessionId);
