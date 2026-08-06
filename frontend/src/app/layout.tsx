@@ -1,6 +1,7 @@
 import './../styles/globals.css';
 import { AuthProvider } from '@/context/AuthContext';
 import ServiceWorkerRegister from '@/components/ServiceWorkerRegister';
+import ThreeBackground from '@/components/ThreeBackground';
 
 export const metadata = {
   title: 'Clipboard Cloud — instant cross-device clipboard sync',
@@ -32,6 +33,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en">
       <body>
+        <ThreeBackground />
         <AuthProvider>{children}</AuthProvider>
         <ServiceWorkerRegister />
       </body>
