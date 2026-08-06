@@ -1,14 +1,15 @@
 :root {
   --bg: #0b0d12;
-  --panel: #12151c;
-  --panel-2: #171b24;
-  --border: #262b36;
+  --panel: #12151cd9;
+  --panel-2: #171b24d9;
+  --border: #2c3241;
+  --border-glow: #6d6dff55;
   --text: #e7e9ee;
   --text-dim: #9aa2b1;
   --accent: #6d6dff;
   --accent-2: #38d9c9;
   --danger: #ff5d6c;
-  --radius: 14px;
+  --radius: 16px;
 }
 
 * {
@@ -22,6 +23,7 @@ html, body {
   color: var(--text);
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Inter, Roboto, sans-serif;
   min-height: 100vh;
+  overflow-x: hidden;
 }
 
 a { color: inherit; }
@@ -31,44 +33,72 @@ button {
   cursor: pointer;
 }
 
+/* Everything but the three.js canvas renders in its own stacking
+   context above it (canvas sits at z-index: 0, fixed, inset: 0). */
 .container {
+  position: relative;
+  z-index: 1;
   max-width: 880px;
   margin: 0 auto;
   padding: 32px 20px 80px;
+  animation: fade-up 0.6s ease both;
 }
 
 .card {
-  background: var(--panel);
+  position: relative;
+  background: linear-gradient(180deg, var(--panel) 0%, var(--panel-2) 100%);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
   border: 1px solid var(--border);
   border-radius: var(--radius);
   padding: 24px;
+  box-shadow: 0 12px 40px -18px rgba(0, 0, 0, 0.6);
+  transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease;
+}
+.card:hover {
+  transform: translateY(-2px);
+  border-color: var(--border-glow);
+  box-shadow: 0 20px 48px -18px rgba(109, 109, 255, 0.25);
 }
 
 .btn {
-  background: var(--accent);
+  background: linear-gradient(135deg, var(--accent) 0%, #8f6dff 100%);
   color: white;
   border: none;
   border-radius: 10px;
   padding: 12px 20px;
   font-size: 15px;
   font-weight: 600;
-  transition: transform 0.1s ease, opacity 0.15s ease;
+  box-shadow: 0 6px 20px -8px rgba(109, 109, 255, 0.6);
+  transition: transform 0.15s ease, opacity 0.15s ease, box-shadow 0.15s ease;
 }
-.btn:hover { opacity: 0.92; }
-.btn:active { transform: scale(0.98); }
+.btn:hover:not(:disabled) {
+  opacity: 0.95;
+  transform: translateY(-1px);
+  box-shadow: 0 10px 26px -8px rgba(109, 109, 255, 0.75);
+}
+.btn:active:not(:disabled) { transform: scale(0.98); }
 .btn.secondary {
   background: var(--panel-2);
   border: 1px solid var(--border);
   color: var(--text);
+  box-shadow: none;
+}
+.btn.secondary:hover:not(:disabled) {
+  border-color: var(--border-glow);
+  box-shadow: 0 6px 18px -10px rgba(109, 109, 255, 0.4);
 }
 .btn.danger {
   background: transparent;
   border: 1px solid var(--danger);
   color: var(--danger);
+  box-shadow: none;
 }
 .btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
 }
 
 input, textarea {
@@ -79,10 +109,12 @@ input, textarea {
   padding: 12px 14px;
   font-size: 15px;
   width: 100%;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 input:focus, textarea:focus {
   outline: none;
   border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(109, 109, 255, 0.18);
 }
 
 .pill {
@@ -102,6 +134,15 @@ input:focus, textarea:focus {
   height: 8px;
   border-radius: 50%;
   background: var(--accent-2);
+  box-shadow: 0 0 8px 1px var(--accent-2);
+  animation: pulse-dot 2s ease-in-out infinite;
+}
+
+.gradient-text {
+  background: linear-gradient(120deg, var(--accent) 0%, var(--accent-2) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
 }
 
 .scrollbar-thin::-webkit-scrollbar { width: 8px; }
@@ -109,3 +150,19 @@ input:focus, textarea:focus {
   background: var(--border);
   border-radius: 8px;
 }
+
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(14px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.45; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .container { animation: none; }
+  .dot { animation: none; }
+}
+
