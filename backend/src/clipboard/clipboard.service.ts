@@ -8,8 +8,6 @@ const historyKey = (sessionId: string) => `clipboard:${sessionId}`;
 @Injectable()
 export class ClipboardService {
   private historyLimit = Number(process.env.CLIPBOARD_HISTORY_LIMIT) || 20;
-  private autoDeleteSeconds =
-    Number(process.env.CLIPBOARD_AUTO_DELETE_SECONDS) || 3600;
 
   constructor(private readonly redis: RedisService) {}
 
@@ -47,7 +45,6 @@ export class ClipboardService {
     await this.redis.listReplace(
       historyKey(sessionId),
       finalList.map((i) => JSON.stringify(i)),
-      this.autoDeleteSeconds,
     );
 
     return item;
@@ -70,7 +67,6 @@ export class ClipboardService {
     await this.redis.listReplace(
       historyKey(sessionId),
       updated.map((i) => JSON.stringify(i)),
-      this.autoDeleteSeconds,
     );
     return updated;
   }
@@ -81,7 +77,6 @@ export class ClipboardService {
     await this.redis.listReplace(
       historyKey(sessionId),
       updated.map((i) => JSON.stringify(i)),
-      this.autoDeleteSeconds,
     );
     return updated;
   }
