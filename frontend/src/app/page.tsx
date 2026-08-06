@@ -76,8 +76,10 @@ export default function HomePage() {
       </div>
 
       <header style={{ textAlign: 'center', marginBottom: 40, marginTop: 8 }}>
-        <div style={{ fontSize: 44, marginBottom: 8 }}>📋☁️</div>
-        <h1 style={{ fontSize: 32, margin: '0 0 8px' }}>Clipboard Cloud</h1>
+        <div style={{ fontSize: 44, marginBottom: 8, filter: 'drop-shadow(0 0 18px rgba(109,109,255,0.45))' }}>📋☁️</div>
+        <h1 className="gradient-text" style={{ fontSize: 34, margin: '0 0 8px', fontWeight: 700, letterSpacing: -0.5 }}>
+          Clipboard Cloud
+        </h1>
         <p style={{ color: 'var(--text-dim)', fontSize: 16, maxWidth: 480, margin: '0 auto' }}>
           Copy on one device, paste on another — instantly. No login, no
           email-to-self, no messaging apps.
@@ -85,7 +87,7 @@ export default function HomePage() {
       </header>
 
       <div style={{ display: 'grid', gap: 20, gridTemplateColumns: '1fr', maxWidth: 480, margin: '0 auto' }}>
-        <div className="card">
+        <div className="card" style={{ animation: 'fade-up 0.6s ease 0.05s both' }}>
           <h2 style={{ marginTop: 0, fontSize: 18 }}>Start on this device</h2>
           <p style={{ color: 'var(--text-dim)', fontSize: 14 }}>
             Generates a QR code and a 6-digit code for another device to scan
@@ -107,7 +109,7 @@ export default function HomePage() {
           </div>
         </div>
 
-        <div className="card">
+        <div className="card" style={{ animation: 'fade-up 0.6s ease 0.15s both' }}>
           <h2 style={{ marginTop: 0, fontSize: 18 }}>Join another device</h2>
           <p style={{ color: 'var(--text-dim)', fontSize: 14 }}>
             Enter the 6-digit code shown on the other device.
