@@ -24,7 +24,6 @@ import { RedisService } from '../redis/redis.service';
 
 const uploadDir = process.env.UPLOAD_DIR || './uploads';
 const maxSizeMb = Number(process.env.MAX_FILE_SIZE_MB) || 25;
-const sessionTtl = Number(process.env.SESSION_TTL_SECONDS) || 1800;
 
 // Extensions we refuse to serve/execute-adjacent content for. This isn't a
 // substitute for a real malware scan, but blocks the most obvious abuse of a
@@ -72,7 +71,7 @@ export class FilesController {
     // Record which session "owns" this file so only paired devices in that
     // session (or, later, the authenticated account that saved it — see
     // download()) can retrieve it, rather than anyone who guesses the URL.
-    await this.redis.set(fileOwnerKey(file.filename), sessionId, sessionTtl);
+    await this.redis.set(fileOwnerKey(file.filename), sessionId);
 
     return {
       fileName: file.originalname,
@@ -102,15 +101,14 @@ export class FilesController {
     const safeName = fileName.replace(/[^a-zA-Z0-9._-]/g, '');
     const filePath = join(uploadDir, safeName);
     if (!existsSync(filePath)) {
-      throw new NotFoundException('File not found (it may have expired).');
+      throw new NotFoundException('File not found.');
     }
 
     // Two ways to be authorized to download:
     //  1. The request carries the sessionId that owns the file (normal
-    //     ephemeral pairing flow, checked against Redis).
+    //     pairing flow, checked against Redis).
     //  2. The request carries a valid account JWT — this covers snippets a
-    //     signed-in user explicitly saved, which should stay retrievable
-    //     even after the original session's TTL has expired.
+    //     signed-in user explicitly saved.
     if (this.hasValidBearerToken(authHeader)) {
       return res.sendFile(filePath, { root: '.' });
     }
