@@ -173,7 +173,7 @@ export class ClipboardGateway
     }
 
     try {
-      const item = await this.clipboardService.addItem(sessionId, dto);
+      const item = await this.clipboardService.addItem(sessionId, dto, client.id);
       // Broadcast to every device in the room, including the sender, so all
       // UIs (including the one that just pasted) stay in sync with the
       // canonical, capped/pinned-aware history order.
@@ -204,11 +204,23 @@ export class ClipboardGateway
     @ConnectedSocket() client: Socket,
     @MessageBody() payload: { sessionId: string; itemId: string },
   ) {
-    const updated = await this.clipboardService.deleteItem(
-      payload.sessionId,
-      payload.itemId,
-    );
-    this.server.to(payload.sessionId).emit('history:sync', updated);
+    const isHost = this.roomDevices
+      .get(payload.sessionId)
+      ?.get(client.id)?.isHost;
+
+    try {
+      const updated = await this.clipboardService.deleteItem(
+        payload.sessionId,
+        payload.itemId,
+        client.id,
+        !!isHost,
+      );
+      this.server.to(payload.sessionId).emit('history:sync', updated);
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : 'Failed to delete item.';
+      client.emit('clipboard:error', { message });
+    }
   }
 
   @SubscribeMessage('clipboard:clear')
