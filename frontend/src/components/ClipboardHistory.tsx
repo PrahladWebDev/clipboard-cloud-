@@ -1,10 +1,30 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import SyntaxHighlighter from 'react-syntax-highlighter';
+import { vs2015 } from 'react-syntax-highlighter/dist/esm/styles/hljs';
 import { fileDownloadUrl } from '@/lib/api';
 import { decryptText, decryptBlob } from '@/lib/crypto';
 import { useAuth } from '@/context/AuthContext';
 import { saveSnippet } from '@/lib/auth';
+
+// Heuristic check for whether pasted text looks like source code, so it can
+// be rendered with VS Code-style syntax highlighting instead of plain text.
+function looksLikeCode(text: string): boolean {
+  if (!text || text.trim().length < 2) return false;
+  const lines = text.split('\n');
+  if (lines.length === 1 && text.length < 40) return false;
+  const signals = [
+    /[{};]\s*$/m,
+    /^[\t ]{2,}\S/m,
+    /\b(function|const|let|var|import|export|class|def|public|private|static|return|=>|#include|package\s)\b/,
+    /^\s*(if|for|while|switch)\s*\(/m,
+    /<\/?[a-zA-Z][^>]*>/,
+  ];
+  let score = 0;
+  for (const re of signals) if (re.test(text)) score++;
+  return score >= 2;
+}
 
 export interface ClipboardItem {
   id: string;
@@ -254,6 +274,15 @@ export default function ClipboardHistory({
                   <a href={content} target="_blank" rel="noreferrer" style={{ color: 'var(--accent-2)', wordBreak: 'break-all' }}>
                     {content}
                   </a>
+                ) : looksLikeCode(content) ? (
+                  <SyntaxHighlighter
+                    language={undefined}
+                    style={vs2015}
+                    customStyle={{ margin: 0, borderRadius: 8, fontSize: 13, maxWidth: '100%' }}
+                    wrapLongLines
+                  >
+                    {content}
+                  </SyntaxHighlighter>
                 ) : (
                   <div style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word', fontSize: 14 }}>{content}</div>
                 )}
