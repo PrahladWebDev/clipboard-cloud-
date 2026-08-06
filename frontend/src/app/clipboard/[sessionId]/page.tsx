@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { getSocket } from '@/lib/socket';
-import { fetchHistory, getSession, keepAlive } from '@/lib/api';
+import { fetchHistory, getSession } from '@/lib/api';
 import { detectDeviceLabel } from '@/lib/device';
 import { importKeyFromBase64, encryptText } from '@/lib/crypto';
 import * as offlineQueue from '@/lib/offlineQueue';
@@ -16,7 +16,6 @@ import DeviceList, { Device } from '@/components/DeviceList';
 interface PairingInfo {
   code: string;
   qrDataUrl: string;
-  expiresInSeconds: number;
   encryptionKeyB64?: string | null;
 }
 
@@ -149,12 +148,7 @@ export default function ClipboardSessionPage() {
 
     fetchHistory(sessionId).then(setItems).catch(() => {});
 
-    const keepAliveInterval = setInterval(() => {
-      keepAlive(sessionId).catch(() => {});
-    }, 60_000);
-
     return () => {
-      clearInterval(keepAliveInterval);
       socket.off('connect');
       socket.off('disconnect');
       socket.off('history:sync');
@@ -314,7 +308,6 @@ export default function ClipboardSessionPage() {
           <QRPairing
             code={pairing.code}
             sessionId={sessionId}
-            expiresInSeconds={pairing.expiresInSeconds}
             deviceCount={Math.max(devices.length, 1)}
             encryptionKeyB64={pairing.encryptionKeyB64}
           />
