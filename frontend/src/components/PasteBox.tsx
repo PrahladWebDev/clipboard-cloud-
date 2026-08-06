@@ -88,8 +88,10 @@ export default function PasteBox({
   }
 
   return (
-    <div className="card">
-      <h2 style={{ marginTop: 0, fontSize: 16 }}>Add text or a link</h2>
+    <div className="card" style={{ animation: 'fade-up 0.5s ease both' }}>
+      <h2 className="gradient-text" style={{ marginTop: 0, fontSize: 16, display: 'inline-block' }}>
+        Add text or a link
+      </h2>
       <textarea
         value={value}
         onChange={(e) => setValue(e.target.value)}
@@ -117,6 +119,7 @@ export default function PasteBox({
               alignSelf: 'center',
               color: sendStatus.ok ? 'var(--accent-2)' : 'var(--danger)',
               fontWeight: 600,
+              animation: 'fade-up 0.25s ease both',
             }}
           >
             {sendStatus.ok ? '✅' : '⚠️'} {sendStatus.text}
