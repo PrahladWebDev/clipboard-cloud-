@@ -8,7 +8,7 @@ import { useAuth } from '@/context/AuthContext';
 
 export default function HomePage() {
   const router = useRouter();
-  const { user, logout } = useAuth();
+  const { user, loading: authLoading, logout } = useAuth();
   const [code, setCode] = useState('');
   const [encrypted, setEncrypted] = useState(false);
   const [loading, setLoading] = useState<'create' | 'join' | null>(null);
@@ -58,8 +58,8 @@ export default function HomePage() {
 
   return (
     <div className="container">
-      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, fontSize: 13 }}>
-        {user ? (
+      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, fontSize: 13, minHeight: 18 }}>
+        {authLoading ? null : user ? (
           <>
             <a href="/snippets" style={{ color: 'var(--text-dim)', textDecoration: 'none' }}>My snippets</a>
             <span style={{ color: 'var(--text-dim)' }}>· {user.email}</span>
