@@ -9,7 +9,6 @@ export interface CreateSessionResponse {
   sessionId: string;
   code: string;
   qrDataUrl: string;
-  expiresInSeconds: number;
 }
 
 export async function createSession(encrypted = false) {
@@ -29,10 +28,6 @@ export async function joinByCode(code: string) {
 export async function getSession(sessionId: string) {
   const { data } = await api.get(`/pairing/${sessionId}`);
   return data;
-}
-
-export async function keepAlive(sessionId: string) {
-  await api.post(`/pairing/${sessionId}/keep-alive`);
 }
 
 export async function fetchHistory(sessionId: string) {
