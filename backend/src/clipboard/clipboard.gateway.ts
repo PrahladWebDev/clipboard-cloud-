@@ -80,7 +80,7 @@ export class ClipboardGateway
     try {
       await this.pairingService.getSession(sessionId);
     } catch {
-      client.emit('room:error', { message: 'Session not found or expired.' });
+      client.emit('room:error', { message: 'Session not found.' });
       return;
     }
 
