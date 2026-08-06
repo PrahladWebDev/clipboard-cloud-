@@ -53,4 +53,8 @@ export interface ClipboardItem {
   description?: string;
   pinned: boolean;
   createdAt: number;
+  /** Socket id of whoever pushed this item — set server-side, never trusted
+   * from the client — so we can tell the sender apart from other devices
+   * for permission checks (e.g. only the sender or the host may delete). */
+  senderSocketId?: string;
 }
