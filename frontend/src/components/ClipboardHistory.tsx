@@ -18,6 +18,7 @@ export interface ClipboardItem {
   deviceLabel?: string;
   description?: string;
   createdAt: number;
+  senderSocketId?: string;
 }
 
 function timeAgo(ts: number) {
@@ -41,12 +42,18 @@ export default function ClipboardHistory({
   items,
   sessionId,
   encryptionKey,
+  mySocketId,
+  isHost,
   onPin,
   onDelete,
 }: {
   items: ClipboardItem[];
   sessionId: string;
   encryptionKey: CryptoKey | null;
+  /** This device's own socket id, to tell "mine" items apart from others. */
+  mySocketId: string | null;
+  /** Whether this device is the host (the one that generated the session). */
+  isHost: boolean;
   onPin: (id: string, pinned: boolean) => void;
   onDelete: (id: string) => void;
 }) {
@@ -251,7 +258,10 @@ export default function ClipboardHistory({
                   <div style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word', fontSize: 14 }}>{content}</div>
                 )}
                 <div style={{ fontSize: 12, color: 'var(--text-dim)', marginTop: 6 }}>
-                  {item.deviceLabel || 'Device'} · {timeAgo(item.createdAt)}
+                  {item.deviceLabel || 'Device'}
+                  {item.senderSocketId === mySocketId && ' (you)'}
+                  {' · '}
+                  {timeAgo(item.createdAt)}
                   {item.encrypted && ' · end-to-end encrypted'}
                 </div>
               </div>
@@ -267,9 +277,11 @@ export default function ClipboardHistory({
                     {savedId === item.id ? '✓ Saved' : 'Save'}
                   </button>
                 )}
-                <button className="btn danger" style={{ padding: '6px 10px', fontSize: 12 }} onClick={() => onDelete(item.id)}>
-                  Delete
-                </button>
+                {(isHost || item.senderSocketId === mySocketId) && (
+                  <button className="btn danger" style={{ padding: '6px 10px', fontSize: 12 }} onClick={() => onDelete(item.id)}>
+                    Delete
+                  </button>
+                )}
               </div>
             </div>
           );
