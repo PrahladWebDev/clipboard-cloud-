@@ -4,6 +4,7 @@ export interface Device {
   socketId: string;
   deviceLabel: string;
   joinedAt: number;
+  isHost: boolean;
 }
 
 function shortId(socketId: string) {
@@ -51,6 +52,21 @@ export default function DeviceList({
                   />
                   {isMe ? myDeviceLabel || d.deviceLabel : d.deviceLabel}
                   {isMe && ' (this device)'}
+                  <span
+                    style={{
+                      marginLeft: 8,
+                      fontSize: 10,
+                      fontWeight: 600,
+                      letterSpacing: 0.4,
+                      textTransform: 'uppercase',
+                      padding: '2px 6px',
+                      borderRadius: 999,
+                      color: d.isHost ? 'var(--accent)' : 'var(--text-dim)',
+                      border: `1px solid ${d.isHost ? 'var(--accent)' : 'var(--border)'}`,
+                    }}
+                  >
+                    {d.isHost ? 'Host · generated' : 'Joined'}
+                  </span>
                 </span>
                 <span style={{ fontSize: 11, color: 'var(--text-dim)', fontFamily: 'monospace' }}>
                   id: {shortId(d.socketId)}
