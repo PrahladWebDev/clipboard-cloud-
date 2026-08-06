@@ -49,7 +49,7 @@ export default function HomePage() {
     } catch (e: any) {
       setError(
         e?.response?.data?.message ||
-          'Invalid or expired code. Ask the other device to generate a new one.',
+          'Invalid code. Ask the other device to generate a new one.',
       );
     } finally {
       setLoading(null);
@@ -133,8 +133,8 @@ export default function HomePage() {
       </div>
 
       <footer style={{ textAlign: 'center', marginTop: 60, color: 'var(--text-dim)', fontSize: 13 }}>
-        Sessions expire automatically after a period of inactivity. Nothing is
-        stored long-term unless you pin an item or save it to an account.
+        Nothing is stored long-term unless you pin an item or save it to an
+        account.
       </footer>
     </div>
   );
