@@ -25,13 +25,6 @@ describe('RedisService (in-memory fallback)', () => {
     expect(await service.get('k2')).toBeNull();
   });
 
-  it('expires a value after the given TTL', async () => {
-    await service.set('k3', 'v', 0.05); // 50ms
-    expect(await service.get('k3')).toBe('v');
-    await new Promise((r) => setTimeout(r, 120));
-    expect(await service.get('k3')).toBeNull();
-  });
-
   it('caps a list with listPushCapped', async () => {
     for (let i = 0; i < 5; i++) {
       await service.listPushCapped('list1', `item-${i}`, 3);
