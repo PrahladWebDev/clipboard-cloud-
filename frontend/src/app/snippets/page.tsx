@@ -48,7 +48,7 @@ export default function SnippetsPage() {
       <h1 style={{ fontSize: 26 }}>My saved snippets</h1>
       <p style={{ color: 'var(--text-dim)', fontSize: 14 }}>
         Items you explicitly saved from a clipboard session. These persist in
-        MongoDB, independent of any session's expiry.
+        MongoDB, independent of the clipboard session they came from.
       </p>
       {snippets.length === 0 && (
         <p style={{ color: 'var(--text-dim)' }}>
