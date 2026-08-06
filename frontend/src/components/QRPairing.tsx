@@ -6,25 +6,17 @@ import QRCode from 'qrcode';
 export default function QRPairing({
   code,
   sessionId,
-  expiresInSeconds,
   deviceCount,
   encryptionKeyB64,
 }: {
   code: string;
   sessionId: string;
-  expiresInSeconds: number;
   deviceCount: number;
   /** Present only when this session was created with E2E encryption on. */
   encryptionKeyB64?: string | null;
 }) {
-  const [remaining, setRemaining] = useState(expiresInSeconds);
   const [qrDataUrl, setQrDataUrl] = useState('');
   const [keyCopied, setKeyCopied] = useState(false);
-
-  useEffect(() => {
-    const t = setInterval(() => setRemaining((r) => Math.max(r - 1, 0)), 1000);
-    return () => clearInterval(t);
-  }, []);
 
   // Generate the QR client-side so the encryption key (if any) can travel as
   // a URL fragment, which browsers never send in HTTP requests — the server
@@ -42,9 +34,6 @@ export default function QRPairing({
     setKeyCopied(true);
     setTimeout(() => setKeyCopied(false), 1500);
   }
-
-  const mins = Math.floor(remaining / 60);
-  const secs = remaining % 60;
 
   if (deviceCount >= 2) {
     return (
@@ -71,7 +60,6 @@ export default function QRPairing({
         />
       )}
       <div style={{ fontSize: 34, letterSpacing: 8, fontWeight: 700, margin: '8px 0' }}>{code}</div>
-      <div className="pill">Expires in {mins}:{secs.toString().padStart(2, '0')}</div>
 
       {encryptionKeyB64 && (
         <div style={{ marginTop: 16, paddingTop: 16, borderTop: '1px solid var(--border)' }}>
