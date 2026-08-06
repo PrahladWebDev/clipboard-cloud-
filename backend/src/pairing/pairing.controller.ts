@@ -31,10 +31,4 @@ export class PairingController {
   async get(@Param('sessionId') sessionId: string) {
     return this.pairingService.getSession(sessionId);
   }
-
-  @Post(':sessionId/keep-alive')
-  async keepAlive(@Param('sessionId') sessionId: string) {
-    await this.pairingService.keepAlive(sessionId);
-    return { ok: true };
-  }
 }
