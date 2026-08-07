@@ -380,6 +380,7 @@ export default function ClipboardSessionPage() {
           devices={devices}
           mySocketId={mySocketId}
           myDeviceLabel={deviceLabel.current}
+          isHost={!!devices.find((d) => d.socketId === mySocketId)?.isHost}
           onKick={(socketId) => getSocket().emit('device:kick', { sessionId, socketId })}
         />
         <ClipboardHistory
