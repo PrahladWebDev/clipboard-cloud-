@@ -18,10 +18,12 @@ import { PushClipboardItemDto } from './dto/clipboard-item.dto';
 interface JoinRoomPayload {
   sessionId: string;
   deviceLabel?: string;
+  deviceId?: string;
 }
 
 interface DeviceInfo {
   socketId: string;
+  deviceId: string;
   deviceLabel: string;
   joinedAt: number;
   isHost: boolean;
@@ -40,9 +42,11 @@ export class ClipboardGateway
   private socketSessions = new Map<string, string>();
   // sessionId -> (socketId -> DeviceInfo), for the device list UI
   private roomDevices = new Map<string, Map<string, DeviceInfo>>();
-  // sessionId -> socketId of the device that generated/created the session
-  // (the first device to join the room). Used to label devices as
-  // "Host" (generated) vs "Joined" in the UI.
+  // sessionId -> deviceId of the device that generated/created the session
+  // (the first device to join the room). Keyed by the persistent, browser-
+  // stored deviceId rather than the ephemeral socket id, so a page refresh
+  // or reconnect doesn't silently hand host status to whoever reconnects
+  // fastest.
   private roomHost = new Map<string, string>();
 
   constructor(
@@ -71,6 +75,7 @@ export class ClipboardGateway
 
   private removeDevice(sessionId: string, socketId: string) {
     const room = this.roomDevices.get(sessionId);
+    const leaving = room?.get(socketId);
     room?.delete(socketId);
 
     if (!room || room.size === 0) {
@@ -79,12 +84,20 @@ export class ClipboardGateway
       return;
     }
 
-    // If the host device left, hand the "Host" label to whichever
-    // remaining device joined earliest, so the badge doesn't just vanish.
-    if (this.roomHost.get(sessionId) === socketId) {
+    if (!leaving) return;
+
+    // Only hand off the "Host" label if the leaving socket was the host
+    // AND no other open tab from that same deviceId is still connected —
+    // otherwise a stray disconnect/reconnect (or a second tab) would steal
+    // host status away from the device that actually created the session.
+    const hostDeviceId = this.roomHost.get(sessionId);
+    const sameDeviceStillConnected = Array.from(room.values()).some(
+      (d) => d.deviceId === hostDeviceId,
+    );
+    if (hostDeviceId === leaving.deviceId && !sameDeviceStillConnected) {
       const next = Array.from(room.values()).sort((a, b) => a.joinedAt - b.joinedAt)[0];
-      this.roomHost.set(sessionId, next.socketId);
-      room.forEach((d) => (d.isHost = d.socketId === next.socketId));
+      this.roomHost.set(sessionId, next.deviceId);
+      room.forEach((d) => (d.isHost = d.deviceId === next.deviceId));
     }
   }
 
@@ -94,6 +107,10 @@ export class ClipboardGateway
     @MessageBody() payload: JoinRoomPayload,
   ) {
     const { sessionId, deviceLabel } = payload;
+    // Fall back to the socket id for older clients that haven't picked up
+    // the persistent deviceId yet, so they still get a stable identity for
+    // this single connection instead of the join failing.
+    const deviceId = payload.deviceId || client.id;
     try {
       await this.pairingService.getSession(sessionId);
     } catch {
@@ -108,18 +125,21 @@ export class ClipboardGateway
       this.roomDevices.set(sessionId, new Map());
     }
 
-    // The first device to join a room is the one that generated the
+    // The first deviceId to join a room is the one that generated the
     // session (it creates the session via REST, then immediately joins).
-    // Every later joiner is a "guest" that scanned/entered the code.
+    // Every later joiner is a "guest" that scanned/entered the code. Because
+    // this is keyed by the persistent deviceId, a refresh/reconnect from
+    // the same browser reclaims host status instead of losing it.
     if (!this.roomHost.has(sessionId)) {
-      this.roomHost.set(sessionId, client.id);
+      this.roomHost.set(sessionId, deviceId);
     }
 
     this.roomDevices.get(sessionId).set(client.id, {
       socketId: client.id,
+      deviceId,
       deviceLabel: deviceLabel || 'Unknown device',
       joinedAt: Date.now(),
-      isHost: this.roomHost.get(sessionId) === client.id,
+      isHost: this.roomHost.get(sessionId) === deviceId,
     });
 
     const history = await this.clipboardService.getHistory(sessionId);
@@ -144,7 +164,8 @@ export class ClipboardGateway
     // Only the host of the room may remove other devices. Without this
     // check, any joined (non-host) device could kick anyone, including
     // the host, since the check above only verifies same-room membership.
-    if (this.roomHost.get(sessionId) !== client.id) return;
+    const requesterDeviceId = this.roomDevices.get(sessionId)?.get(client.id)?.deviceId;
+    if (!requesterDeviceId || this.roomHost.get(sessionId) !== requesterDeviceId) return;
 
     // A host can't kick themselves via this action.
     if (socketId === client.id) return;
