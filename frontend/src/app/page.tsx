@@ -86,7 +86,16 @@ export default function HomePage() {
         </p>
       </header>
 
-      <div style={{ display: 'grid', gap: 20, gridTemplateColumns: '1fr', maxWidth: 480, margin: '0 auto' }}>
+      <div
+        style={{
+          display: 'grid',
+          gap: 20,
+          gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+          maxWidth: 820,
+          margin: '0 auto',
+          alignItems: 'start',
+        }}
+      >
         <div className="card" style={{ animation: 'fade-up 0.6s ease 0.05s both' }}>
           <h2 style={{ marginTop: 0, fontSize: 18 }}>Start on this device</h2>
           <p style={{ color: 'var(--text-dim)', fontSize: 14 }}>
@@ -130,7 +139,7 @@ export default function HomePage() {
         </div>
 
         {error && (
-          <div style={{ color: 'var(--danger)', fontSize: 14, textAlign: 'center' }}>{error}</div>
+          <div style={{ gridColumn: '1 / -1', color: 'var(--danger)', fontSize: 14, textAlign: 'center' }}>{error}</div>
         )}
       </div>
 
