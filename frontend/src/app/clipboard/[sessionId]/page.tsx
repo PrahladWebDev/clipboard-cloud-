@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { getSocket } from '@/lib/socket';
 import { fetchHistory, getSession } from '@/lib/api';
-import { detectDeviceLabel } from '@/lib/device';
+import { detectDeviceLabel, getOrCreateDeviceId } from '@/lib/device';
 import { importKeyFromBase64, encryptText } from '@/lib/crypto';
 import * as offlineQueue from '@/lib/offlineQueue';
 import QRPairing from '@/components/QRPairing';
@@ -36,6 +36,7 @@ export default function ClipboardSessionPage() {
   const [kicked, setKicked] = useState(false);
   const lastClipboardRef = useRef('');
   const deviceLabel = useRef(detectDeviceLabel());
+  const deviceId = useRef(getOrCreateDeviceId());
 
   // Load pairing info (only present on the device that created the session),
   // then resolve whether this session is encrypted and — if so — the key.
@@ -106,7 +107,7 @@ export default function ClipboardSessionPage() {
     const socket = getSocket();
 
     function join() {
-      socket.emit('room:join', { sessionId, deviceLabel: deviceLabel.current });
+      socket.emit('room:join', { sessionId, deviceLabel: deviceLabel.current, deviceId: deviceId.current });
     }
 
     if (socket.connected) {
