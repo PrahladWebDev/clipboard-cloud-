@@ -141,6 +141,14 @@ export class ClipboardGateway
     // Only allow kicking devices within the same room the requester is in.
     if (this.socketSessions.get(client.id) !== sessionId) return;
 
+    // Only the host of the room may remove other devices. Without this
+    // check, any joined (non-host) device could kick anyone, including
+    // the host, since the check above only verifies same-room membership.
+    if (this.roomHost.get(sessionId) !== client.id) return;
+
+    // A host can't kick themselves via this action.
+    if (socketId === client.id) return;
+
     const targetSocket = this.server.sockets.sockets.get(socketId);
     if (targetSocket) {
       targetSocket.emit('device:kicked');
