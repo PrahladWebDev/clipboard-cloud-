@@ -15,11 +15,14 @@ export default function DeviceList({
   devices,
   mySocketId,
   myDeviceLabel,
+  isHost,
   onKick,
 }: {
   devices: Device[];
   mySocketId: string | null;
   myDeviceLabel?: string;
+  /** Whether this device is the host — only hosts are allowed to remove devices. */
+  isHost: boolean;
   onKick: (socketId: string) => void;
 }) {
   if (devices.length === 0) return null;
@@ -72,7 +75,7 @@ export default function DeviceList({
                   id: {shortId(d.socketId)}
                 </span>
               </span>
-              {!isMe && (
+              {isHost && !isMe && (
                 <button
                   className="btn danger"
                   style={{ padding: '4px 10px', fontSize: 12 }}
