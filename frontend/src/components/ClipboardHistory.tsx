@@ -294,7 +294,7 @@ export default function ClipboardHistory({
                   {item.encrypted && ' · end-to-end encrypted'}
                 </div>
               </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, position: 'sticky', top: 0, alignSelf: 'flex-start' }}>
                 <button className="btn secondary" style={{ padding: '6px 10px', fontSize: 12 }} onClick={() => copyItem(item)}>
                   {copiedId === item.id ? '✓ Copied' : 'Copy'}
                 </button>
