@@ -237,12 +237,15 @@ export default function ClipboardHistory({
                       color: 'var(--text-dim)',
                       marginBottom: 6,
                       fontStyle: 'italic',
-                      background: 'var(--panel)',
+                      background: 'var(--panel-2)',
                       border: '1px solid var(--border)',
                       borderRadius: 6,
                       padding: '4px 8px',
                       display: 'inline-block',
                       wordBreak: 'break-word',
+                      position: 'sticky',
+                      top: 0,
+                      zIndex: 1,
                     }}
                   >
                     📝 {description}
