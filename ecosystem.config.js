@@ -3,13 +3,14 @@ module.exports = {
     {
       name: 'clipboard-api',
       script: 'dist/src/main.js',
-      cwd: '/home/prahlad/clipboard-cloud/backend',
+      cwd: '/var/www/projects/clipboard-cloud/backend',
       instances: 1,
       autorestart: true,
       watch: false,
       max_memory_restart: '512M',
       env_production: {
         NODE_ENV: 'production',
+        PORT: 5008,
       },
     },
     {
@@ -17,7 +18,7 @@ module.exports = {
       script: 'npm',
       args: 'start',
       interpreter: 'none',
-      cwd: '/home/prahlad/clipboard-cloud/frontend',
+      cwd: '/var/www/projects/clipboard-cloud/frontend',
       instances: 1,
       autorestart: true,
       watch: false,
