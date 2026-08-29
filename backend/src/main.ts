@@ -24,6 +24,7 @@ async function bootstrap() {
     // / SaveSnippetDto) — well past Express's 100KB default.
     bodyParser: false,
   });
+  app.set('trust proxy', 1);   // <-- add this line
 
   app.use(json({ limit: '2mb' }));
   app.use(urlencoded({ extended: true, limit: '2mb' }));
