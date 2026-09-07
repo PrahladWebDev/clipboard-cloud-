@@ -161,6 +161,67 @@ input:focus, textarea:focus {
   50% { opacity: 0.45; }
 }
 
+/* Diff Checker */
+.diff-input-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+@media (max-width: 640px) {
+  .diff-input-grid { grid-template-columns: 1fr; }
+}
+
+.diff-view {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--panel-2);
+  max-height: 420px;
+  overflow: auto;
+  font-family: monospace;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.diff-line {
+  display: grid;
+  grid-template-columns: 40px 40px 18px 1fr;
+  white-space: pre-wrap;
+  word-break: break-word;
+  padding: 0 8px;
+}
+.diff-line__no {
+  color: var(--text-dim);
+  text-align: right;
+  padding-right: 8px;
+  user-select: none;
+  opacity: 0.6;
+}
+.diff-line__marker {
+  text-align: center;
+  font-weight: 700;
+  user-select: none;
+}
+.diff-line--add {
+  background: rgba(56, 217, 201, 0.12);
+}
+.diff-line--add .diff-line__marker { color: var(--accent-2); }
+.diff-line--remove {
+  background: rgba(255, 93, 108, 0.12);
+}
+.diff-line--remove .diff-line__marker { color: var(--danger); }
+
+.diff-word {
+  border-radius: 3px;
+  padding: 0 2px;
+  color: inherit;
+}
+.diff-word--add {
+  background: rgba(56, 217, 201, 0.4);
+}
+.diff-word--remove {
+  background: rgba(255, 93, 108, 0.4);
+}
+
 @media (prefers-reduced-motion: reduce) {
   .container { animation: none; }
   .dot { animation: none; }

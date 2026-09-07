@@ -12,6 +12,7 @@ import PasteBox from '@/components/PasteBox';
 import FileDrop from '@/components/FileDrop';
 import ClipboardHistory, { ClipboardItem } from '@/components/ClipboardHistory';
 import DeviceList, { Device } from '@/components/DeviceList';
+import DiffChecker from '@/components/DiffChecker';
 
 interface PairingInfo {
   code: string;
@@ -377,6 +378,7 @@ export default function ClipboardSessionPage() {
             return result;
           }}
         />
+        <DiffChecker />
         <DeviceList
           devices={devices}
           mySocketId={mySocketId}
