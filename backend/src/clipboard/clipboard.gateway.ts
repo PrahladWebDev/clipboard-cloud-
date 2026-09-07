@@ -29,6 +29,15 @@ interface DeviceInfo {
   isHost: boolean;
 }
 
+interface DiffPanelState {
+  open: boolean;
+  theirCode: string;
+  yourCode: string;
+  theirPastedBy: string | null;
+  yourPastedBy: string | null;
+  lastCompare: { deviceLabel: string; at: number } | null;
+}
+
 @WebSocketGateway({
   cors: { origin: process.env.CORS_ORIGIN || 'http://localhost:3000' },
 })
@@ -48,6 +57,28 @@ export class ClipboardGateway
   // or reconnect doesn't silently hand host status to whoever reconnects
   // fastest.
   private roomHost = new Map<string, string>();
+  // sessionId -> shared Diff Checker panel state (open/closed, both text
+  // boxes, and who last pasted/compared) — so the panel and its contents
+  // are synced across every device in the room, not just local UI state.
+  private roomDiff = new Map<string, DiffPanelState>();
+
+  private defaultDiffState(): DiffPanelState {
+    return {
+      open: false,
+      theirCode: '',
+      yourCode: '',
+      theirPastedBy: null,
+      yourPastedBy: null,
+      lastCompare: null,
+    };
+  }
+
+  private getDiffState(sessionId: string): DiffPanelState {
+    if (!this.roomDiff.has(sessionId)) {
+      this.roomDiff.set(sessionId, this.defaultDiffState());
+    }
+    return this.roomDiff.get(sessionId);
+  }
 
   constructor(
     private readonly clipboardService: ClipboardService,
@@ -81,6 +112,7 @@ export class ClipboardGateway
     if (!room || room.size === 0) {
       this.roomDevices.delete(sessionId);
       this.roomHost.delete(sessionId);
+      this.roomDiff.delete(sessionId);
       return;
     }
 
@@ -144,6 +176,10 @@ export class ClipboardGateway
 
     const history = await this.clipboardService.getHistory(sessionId);
     client.emit('history:sync', history);
+    // Bring a (re)joining device up to speed on the shared Diff Checker
+    // panel — otherwise it would show closed/empty even if another device
+    // already opened it and pasted content.
+    client.emit('diff:state', this.getDiffState(sessionId));
 
     client.to(sessionId).emit('device:joined', {
       socketId: client.id,
@@ -259,5 +295,88 @@ export class ClipboardGateway
   ) {
     await this.clipboardService.clearHistory(payload.sessionId);
     this.server.to(payload.sessionId).emit('history:sync', []);
+  }
+
+  @SubscribeMessage('diff:open')
+  onDiffOpen(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() payload: { sessionId: string },
+  ) {
+    const state = this.getDiffState(payload.sessionId);
+    state.open = true;
+    // Broadcast to the whole room (including the opener) so every screen —
+    // not just the one that clicked "Add Diff Check" — shows the panel.
+    this.server.to(payload.sessionId).emit('diff:state', state);
+  }
+
+  @SubscribeMessage('diff:close')
+  onDiffClose(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() payload: { sessionId: string },
+  ) {
+    const state = this.defaultDiffState();
+    this.roomDiff.set(payload.sessionId, state);
+    this.server.to(payload.sessionId).emit('diff:state', state);
+  }
+
+  @SubscribeMessage('diff:update')
+  onDiffUpdate(
+    @ConnectedSocket() client: Socket,
+    @MessageBody()
+    payload: {
+      sessionId: string;
+      side: 'their' | 'your';
+      content: string;
+      deviceLabel?: string;
+    },
+  ) {
+    const { sessionId, side, content, deviceLabel } = payload;
+    const state = this.getDiffState(sessionId);
+    state.open = true;
+    if (side === 'their') {
+      state.theirCode = content;
+      state.theirPastedBy = content ? deviceLabel || 'A device' : null;
+    } else {
+      state.yourCode = content;
+      state.yourPastedBy = content ? deviceLabel || 'A device' : null;
+    }
+    // Echo to everyone *else* in the room. The sender already reflects the
+    // keystroke locally, so looping it back would just fight with whatever
+    // they're actively typing next.
+    client.to(sessionId).emit('diff:state', state);
+  }
+
+  @SubscribeMessage('diff:compare')
+  onDiffCompare(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() payload: { sessionId: string; deviceLabel?: string },
+  ) {
+    const { sessionId, deviceLabel } = payload;
+    const state = this.getDiffState(sessionId);
+    state.lastCompare = { deviceLabel: deviceLabel || 'A device', at: Date.now() };
+    // Broadcast to the whole room, including the requester, carrying the
+    // canonical (server-held) contents of both boxes plus who ran the
+    // comparison — so every device renders the identical diff and knows
+    // who triggered it, instead of each device diffing its own local copy.
+    this.server.to(sessionId).emit('diff:result', {
+      theirCode: state.theirCode,
+      yourCode: state.yourCode,
+      deviceLabel: state.lastCompare.deviceLabel,
+      at: state.lastCompare.at,
+    });
+  }
+
+  @SubscribeMessage('diff:clear')
+  onDiffClear(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() payload: { sessionId: string },
+  ) {
+    const state = this.getDiffState(payload.sessionId);
+    state.theirCode = '';
+    state.yourCode = '';
+    state.theirPastedBy = null;
+    state.yourPastedBy = null;
+    state.lastCompare = null;
+    this.server.to(payload.sessionId).emit('diff:state', state);
   }
 }

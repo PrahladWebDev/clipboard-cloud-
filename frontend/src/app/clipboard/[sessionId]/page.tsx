@@ -378,7 +378,7 @@ export default function ClipboardSessionPage() {
             return result;
           }}
         />
-        <DiffChecker />
+        <DiffChecker sessionId={sessionId} deviceLabel={deviceLabel.current} />
         <DeviceList
           devices={devices}
           mySocketId={mySocketId}
