@@ -195,8 +195,8 @@ input:focus, textarea:focus {
   padding: 0 8px;
 }
 .diff-line__text {
-  white-space: pre;
-  overflow-x: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
   display: block;
 }
 .diff-line--blank {
