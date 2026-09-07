@@ -1,8 +1,50 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { diffLines, DiffResult } from '@/lib/diff';
+import { diffLines, DiffLine, DiffResult } from '@/lib/diff';
 import { getSocket } from '@/lib/socket';
+
+interface DiffRow {
+  left: DiffLine | null;
+  right: DiffLine | null;
+}
+
+/**
+ * Groups the flat DiffLine[] (produced by diffLines) into left/right rows
+ * for a side-by-side split view — the way most diff-checker sites show it,
+ * rather than one interleaved column. A "modified" block (a remove
+ * immediately followed by its paired add, both carrying `.words`) becomes
+ * one row with the old line on the left and the new line on the right;
+ * anything else lands on whichever side it belongs to, with the other side
+ * blank for that row.
+ */
+function buildSplitRows(lines: DiffLine[]): DiffRow[] {
+  const rows: DiffRow[] = [];
+  let i = 0;
+  while (i < lines.length) {
+    const line = lines[i];
+    if (line.type === 'equal') {
+      rows.push({ left: line, right: line });
+      i++;
+      continue;
+    }
+    if (line.type === 'remove') {
+      const next = lines[i + 1];
+      if (next && next.type === 'add' && line.words && next.words) {
+        rows.push({ left: line, right: next });
+        i += 2;
+        continue;
+      }
+      rows.push({ left: line, right: null });
+      i++;
+      continue;
+    }
+    // Unpaired addition.
+    rows.push({ left: null, right: line });
+    i++;
+  }
+  return rows;
+}
 
 interface DiffPanelState {
   open: boolean;
@@ -201,31 +243,75 @@ export default function DiffChecker({ sessionId, deviceLabel }: DiffCheckerProps
                 </span>
                 <span className="pill">{result.stats.unchanged} unchanged</span>
               </div>
-              <div className="diff-view scrollbar-thin">
-                {result.lines.map((line, idx) => (
-                  <div key={idx} className={`diff-line diff-line--${line.type}`}>
-                    <span className="diff-line__no">{line.leftNo ?? ''}</span>
-                    <span className="diff-line__no">{line.rightNo ?? ''}</span>
-                    <span className="diff-line__marker">
-                      {line.type === 'add' ? '+' : line.type === 'remove' ? '−' : ' '}
-                    </span>
-                    <span className="diff-line__text">
-                      {line.words
-                        ? line.words.map((seg, sIdx) =>
-                            seg.changed ? (
-                              <mark key={sIdx} className={`diff-word diff-word--${line.type}`}>
-                                {seg.text}
-                              </mark>
-                            ) : (
-                              <span key={sIdx}>{seg.text}</span>
-                            ),
-                          )
-                        : line.text.length
-                          ? line.text
-                          : ' '}
-                    </span>
+              <div className="diff-split-grid">
+                <div>
+                  <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 4 }}>Their side</div>
+                  <div className="diff-view scrollbar-thin">
+                    {buildSplitRows(result.lines).map((row, idx) => {
+                      const line = row.left;
+                      const type = line ? line.type : 'blank';
+                      return (
+                        <div key={idx} className={`diff-line diff-line--${type}`}>
+                          <span className="diff-line__no">{line?.leftNo ?? ''}</span>
+                          <span className="diff-line__marker">{line?.type === 'remove' ? '−' : ' '}</span>
+                          <span className="diff-line__text">
+                            {line
+                              ? line.words
+                                ? line.words
+                                    .filter((seg) => !seg.changed || line.type === 'remove')
+                                    .map((seg, sIdx) =>
+                                      seg.changed ? (
+                                        <mark key={sIdx} className="diff-word diff-word--remove">
+                                          {seg.text}
+                                        </mark>
+                                      ) : (
+                                        <span key={sIdx}>{seg.text}</span>
+                                      ),
+                                    )
+                                : line.text.length
+                                  ? line.text
+                                  : ' '
+                              : ' '}
+                          </span>
+                        </div>
+                      );
+                    })}
                   </div>
-                ))}
+                </div>
+                <div>
+                  <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 4 }}>Your side</div>
+                  <div className="diff-view scrollbar-thin">
+                    {buildSplitRows(result.lines).map((row, idx) => {
+                      const line = row.right;
+                      const type = line ? line.type : 'blank';
+                      return (
+                        <div key={idx} className={`diff-line diff-line--${type}`}>
+                          <span className="diff-line__no">{line?.rightNo ?? ''}</span>
+                          <span className="diff-line__marker">{line?.type === 'add' ? '+' : ' '}</span>
+                          <span className="diff-line__text">
+                            {line
+                              ? line.words
+                                ? line.words
+                                    .filter((seg) => !seg.changed || line.type === 'add')
+                                    .map((seg, sIdx) =>
+                                      seg.changed ? (
+                                        <mark key={sIdx} className="diff-word diff-word--add">
+                                          {seg.text}
+                                        </mark>
+                                      ) : (
+                                        <span key={sIdx}>{seg.text}</span>
+                                      ),
+                                    )
+                                : line.text.length
+                                  ? line.text
+                                  : ' '
+                              : ' '}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
               </div>
             </>
           )}

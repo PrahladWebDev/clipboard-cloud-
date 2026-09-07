@@ -171,12 +171,19 @@ input:focus, textarea:focus {
   .diff-input-grid { grid-template-columns: 1fr; }
 }
 
+.diff-split-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+@media (max-width: 640px) {
+  .diff-split-grid { grid-template-columns: 1fr; }
+}
+
 .diff-view {
   border: 1px solid var(--border);
   border-radius: 10px;
   background: var(--panel-2);
-  max-height: 420px;
-  overflow: auto;
   font-family: monospace;
   font-size: 13px;
   line-height: 1.6;
@@ -184,10 +191,13 @@ input:focus, textarea:focus {
 
 .diff-line {
   display: grid;
-  grid-template-columns: 40px 40px 18px 1fr;
+  grid-template-columns: 40px 18px 1fr;
   white-space: pre-wrap;
   word-break: break-word;
   padding: 0 8px;
+}
+.diff-line--blank {
+  opacity: 0.35;
 }
 .diff-line__no {
   color: var(--text-dim);
