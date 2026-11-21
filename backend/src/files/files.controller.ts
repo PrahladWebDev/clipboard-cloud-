@@ -4,7 +4,10 @@ import {
   Controller,
   Get,
   Headers,
+  Logger,
   NotFoundException,
+  OnModuleDestroy,
+  OnModuleInit,
   Param,
   Post,
   Query,
@@ -16,14 +19,19 @@ import { Throttle } from '@nestjs/throttler';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { JwtService } from '@nestjs/jwt';
 import { diskStorage } from 'multer';
-import { extname, join } from 'path';
-import { existsSync } from 'fs';
+import { extname, join, resolve } from 'path';
+import { existsSync, promises as fsp } from 'fs';
 import { v4 as uuidv4 } from 'uuid';
 import type { Response } from 'express';
 import { RedisService } from '../redis/redis.service';
 
 const uploadDir = process.env.UPLOAD_DIR || './uploads';
-const maxSizeMb = Number(process.env.MAX_FILE_SIZE_MB) || 25;
+// Hard cap per file. 50 MB unless overridden by MAX_FILE_SIZE_MB.
+const maxSizeMb = Number(process.env.MAX_FILE_SIZE_MB) || 50;
+// Uploaded files are deleted this many hours after upload (default 24h).
+const fileTtlHours = Number(process.env.FILE_TTL_HOURS) || 24;
+const fileTtlMs = fileTtlHours * 60 * 60 * 1000;
+const CLEANUP_INTERVAL_MS = 15 * 60 * 1000;
 
 // Extensions we refuse to serve/execute-adjacent content for. This isn't a
 // substitute for a real malware scan, but blocks the most obvious abuse of a
@@ -33,15 +41,55 @@ const BLOCKED_EXTENSIONS = new Set([
 ]);
 
 const fileOwnerKey = (fileName: string) => `file-owner:${fileName}`;
+const fileNameKey = (fileName: string) => `file-name:${fileName}`;
 
 @Controller('files')
-export class FilesController {
+export class FilesController implements OnModuleInit, OnModuleDestroy {
+  private readonly logger = new Logger(FilesController.name);
+  private cleanupTimer: NodeJS.Timeout | null = null;
+
   constructor(
     private readonly redis: RedisService,
     private readonly jwtService: JwtService,
   ) {}
 
-  @Throttle({ default: { limit: 20, ttl: 60_000 } })
+  onModuleInit() {
+    this.cleanupExpiredFiles();
+    this.cleanupTimer = setInterval(
+      () => this.cleanupExpiredFiles(),
+      CLEANUP_INTERVAL_MS,
+    );
+  }
+
+  onModuleDestroy() {
+    if (this.cleanupTimer) clearInterval(this.cleanupTimer);
+  }
+
+  /** Deletes every uploaded file older than the TTL (24h by default). */
+  private async cleanupExpiredFiles() {
+    try {
+      const names = await fsp.readdir(uploadDir);
+      const now = Date.now();
+      for (const name of names) {
+        const full = join(uploadDir, name);
+        try {
+          const stat = await fsp.stat(full);
+          if (!stat.isFile() || now - stat.mtimeMs < fileTtlMs) continue;
+          await fsp.unlink(full);
+          await this.redis.del(fileOwnerKey(name));
+          await this.redis.del(fileNameKey(name));
+          this.logger.log(`Deleted expired upload ${name}`);
+        } catch {
+          // file vanished or is locked — try again next sweep
+        }
+      }
+    } catch (err) {
+      this.logger.warn(`Upload cleanup failed: ${(err as Error).message}`);
+    }
+  }
+
+  // Upload rate limit: 5 uploads per minute per IP (global limit is 120/min).
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
   @Post('upload')
   @UseInterceptors(
     FileInterceptor('file', {
@@ -72,12 +120,14 @@ export class FilesController {
     // session (or, later, the authenticated account that saved it — see
     // download()) can retrieve it, rather than anyone who guesses the URL.
     await this.redis.set(fileOwnerKey(file.filename), sessionId);
+    await this.redis.set(fileNameKey(file.filename), file.originalname);
 
     return {
       fileName: file.originalname,
       mimeType: file.mimetype,
       size: file.size,
       fileUrl: `/api/files/${file.filename}`,
+      expiresAt: Date.now() + fileTtlMs,
     };
   }
 
@@ -95,13 +145,16 @@ export class FilesController {
   async download(
     @Param('fileName') fileName: string,
     @Query('sessionId') sessionId: string,
+    @Query('download') download: string,
     @Headers('authorization') authHeader: string,
     @Res() res: Response,
   ) {
     const safeName = fileName.replace(/[^a-zA-Z0-9._-]/g, '');
     const filePath = join(uploadDir, safeName);
     if (!existsSync(filePath)) {
-      throw new NotFoundException('File not found.');
+      throw new NotFoundException(
+        `File not found — files are deleted ${fileTtlHours} hours after upload.`,
+      );
     }
 
     // Two ways to be authorized to download:
@@ -109,17 +162,21 @@ export class FilesController {
     //     pairing flow, checked against Redis).
     //  2. The request carries a valid account JWT — this covers snippets a
     //     signed-in user explicitly saved.
-    if (this.hasValidBearerToken(authHeader)) {
-      return res.sendFile(filePath, { root: '.' });
+    const authorized = this.hasValidBearerToken(authHeader);
+    if (!authorized) {
+      const owner = await this.redis.get(fileOwnerKey(safeName));
+      if (!owner || !sessionId || owner !== sessionId) {
+        throw new BadRequestException(
+          'A valid sessionId (or account login) is required to download this file.',
+        );
+      }
     }
 
-    const owner = await this.redis.get(fileOwnerKey(safeName));
-    if (!owner || !sessionId || owner !== sessionId) {
-      throw new BadRequestException(
-        'A valid sessionId (or account login) is required to download this file.',
-      );
+    // ?download=1 forces a "Save as…" download using the original file name.
+    if (download === '1') {
+      const original = (await this.redis.get(fileNameKey(safeName))) || safeName;
+      return res.download(resolve(filePath), original);
     }
-
     return res.sendFile(filePath, { root: '.' });
   }
 }

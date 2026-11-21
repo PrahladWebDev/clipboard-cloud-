@@ -61,8 +61,15 @@ export async function uploadFile(
   return data as { fileName: string; mimeType: string; size: number; fileUrl: string };
 }
 
-export function fileDownloadUrl(fileUrl: string, sessionId?: string) {
-  return sessionId
-    ? `${API_URL}${fileUrl}?sessionId=${encodeURIComponent(sessionId)}`
-    : `${API_URL}${fileUrl}`;
+export const MAX_FILE_MB = 50;
+
+export function fileDownloadUrl(
+  fileUrl: string,
+  sessionId?: string,
+  forceDownload = false,
+) {
+  const params: string[] = [];
+  if (sessionId) params.push(`sessionId=${encodeURIComponent(sessionId)}`);
+  if (forceDownload) params.push('download=1');
+  return `${API_URL}${fileUrl}${params.length ? `?${params.join('&')}` : ''}`;
 }

@@ -1,7 +1,7 @@
 'use client';
 
 import { useRef, useState } from 'react';
-import { uploadFile } from '@/lib/api';
+import { uploadFile, MAX_FILE_MB } from '@/lib/api';
 import { encryptBlob } from '@/lib/crypto';
 
 type SendResult = { ok: boolean; message?: string } | void;
@@ -29,12 +29,16 @@ export default function FileDrop({
 
   function showStatus(ok: boolean, text: string) {
     setStatus({ ok, text });
-    setTimeout(() => setStatus(null), 2500);
+    setTimeout(() => setStatus(null), 4000);
   }
 
   async function handleFiles(files: FileList | null) {
     if (!files || files.length === 0) return;
     const file = files[0];
+    if (file.size > MAX_FILE_MB * 1024 * 1024) {
+      showStatus(false, `File is too large — max ${MAX_FILE_MB} MB.`);
+      return;
+    }
     setProgress(0);
     try {
       const isImage = file.type.startsWith('image/');
@@ -55,8 +59,15 @@ export default function FileDrop({
       } else {
         showStatus(true, `${file.name} sent ✓`);
       }
-    } catch {
-      showStatus(false, 'Upload failed — try again.');
+    } catch (err: any) {
+      const code = err?.response?.status;
+      if (code === 429) {
+        showStatus(false, 'Too many uploads — wait a minute and try again.');
+      } else if (code === 413) {
+        showStatus(false, `File is too large — max ${MAX_FILE_MB} MB.`);
+      } else {
+        showStatus(false, err?.response?.data?.message || 'Upload failed — try again.');
+      }
     } finally {
       setProgress(null);
     }
@@ -81,7 +92,7 @@ export default function FileDrop({
         textAlign: 'center',
         borderStyle: 'dashed',
         borderColor: dragOver ? 'var(--accent)' : 'var(--border)',
-        background: dragOver ? 'rgba(109,109,255,0.08)' : 'var(--panel)',
+        background: dragOver ? 'var(--drag-bg)' : 'var(--panel)',
       }}
     >
       <input ref={inputRef} type="file" hidden onChange={(e) => handleFiles(e.target.files)} />
@@ -90,6 +101,9 @@ export default function FileDrop({
         {progress !== null
           ? `Uploading… ${progress}%`
           : `Drag & drop a file or image here, or click to browse${encryptionKey ? ' (encrypted)' : ''}`}
+      </p>
+      <p style={{ margin: '4px 0 0', color: 'var(--text-dim)', fontSize: 12, opacity: 0.8 }}>
+        Max {MAX_FILE_MB} MB · files are deleted after 24 hours
       </p>
       {status && (
         <p

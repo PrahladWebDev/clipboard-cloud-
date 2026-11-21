@@ -2,11 +2,32 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import SyntaxHighlighter from 'react-syntax-highlighter';
-import { vs2015 } from 'react-syntax-highlighter/dist/esm/styles/hljs';
+import { vs2015, vs } from 'react-syntax-highlighter/dist/esm/styles/hljs';
 import { fileDownloadUrl } from '@/lib/api';
 import { decryptText, decryptBlob } from '@/lib/crypto';
 import { useAuth } from '@/context/AuthContext';
 import { saveSnippet } from '@/lib/auth';
+import { useTheme } from '@/components/ThemeToggle';
+
+// Uploaded files are deleted by the server after 24 hours.
+const FILE_TTL_MS = 24 * 60 * 60 * 1000;
+
+function isExpiredFile(item: { type: string; createdAt: number }) {
+  return (item.type === 'file' || item.type === 'image') && Date.now() - item.createdAt > FILE_TTL_MS;
+}
+
+function expiresIn(createdAt: number) {
+  const ms = createdAt + FILE_TTL_MS - Date.now();
+  const h = Math.max(1, Math.ceil(ms / 3_600_000));
+  return `deletes in ~${h}h`;
+}
+
+// Long text is clamped so one big paste never pushes the next items (and
+// their Copy buttons) off-screen.
+function isLong(text: string | null) {
+  if (!text) return false;
+  return text.length > 400 || text.split('\n').length > 7;
+}
 
 // Heuristic check for whether pasted text looks like source code, so it can
 // be rendered with VS Code-style syntax highlighting instead of plain text.
@@ -78,6 +99,8 @@ export default function ClipboardHistory({
   onDelete: (id: string) => void;
 }) {
   const { user } = useAuth();
+  const theme = useTheme();
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [query, setQuery] = useState('');
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [savedId, setSavedId] = useState<string | null>(null);
@@ -88,7 +111,7 @@ export default function ClipboardHistory({
   useEffect(() => {
     if (!encryptionKey) return;
     items
-      .filter((i) => i.encrypted && decrypted[i.id] === undefined)
+      .filter((i) => i.encrypted && decrypted[i.id] === undefined && !isExpiredFile(i))
       .forEach(async (item) => {
         try {
           if (item.type === 'text' || item.type === 'url') {
@@ -208,113 +231,146 @@ export default function ClipboardHistory({
         </p>
       )}
 
-      <div
-        className="scrollbar-thin"
-        style={{ display: 'flex', flexDirection: 'column', gap: 10, maxHeight: 480, overflowY: 'auto' }}
-      >
+      {/* No inner scroll box: every item is its own card and the page scrolls. */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
         {filtered.map((item) => {
           const content = displayContent(item);
           const description = displayDescription(item);
+          const expired = isExpiredFile(item);
+          const isFileLike = item.type === 'image' || item.type === 'file';
+          const isText = item.type === 'text' || item.type === 'url';
+          const long = isText && isLong(content);
+          const clamped = long && !expanded[item.id];
+          const downloadHref = item.encrypted
+            ? content || undefined
+            : item.fileUrl
+              ? fileDownloadUrl(item.fileUrl, sessionId, true)
+              : undefined;
+          const smallBtn = { padding: '6px 10px', fontSize: 12 } as const;
+
           return (
-            <div
-              key={item.id}
-              style={{
-                display: 'flex',
-                gap: 12,
-                alignItems: 'flex-start',
-                background: 'var(--panel-2)',
-                border: '1px solid var(--border)',
-                borderRadius: 10,
-                padding: 12,
-              }}
-            >
-              <div style={{ fontSize: 20 }}>{item.encrypted ? '🔒' : iconFor(item)}</div>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                {description && (
-                  <div
-                    style={{
-                      fontSize: 13,
-                      color: 'var(--text-dim)',
-                      marginBottom: 6,
-                      fontStyle: 'italic',
-                      background: 'var(--panel-2)',
-                      border: '1px solid var(--border)',
-                      borderRadius: 6,
-                      padding: '4px 8px',
-                      display: 'inline-block',
-                      wordBreak: 'break-word',
-                      position: 'sticky',
-                      top: 0,
-                      zIndex: 1,
-                    }}
-                  >
-                    📝 {description}
-                  </div>
-                )}
-                {content === null ? (
-                  <div style={{ fontSize: 13, color: 'var(--text-dim)' }}>
-                    {decrypted[item.id] === '__DECRYPT_FAILED__'
-                      ? 'Could not decrypt — this device may not have the session key.'
-                      : 'Decrypting…'}
-                  </div>
-                ) : item.type === 'image' ? (
-                  <img
-                    src={item.encrypted ? content : fileDownloadUrl(item.fileUrl!, sessionId)}
-                    alt={item.fileName || 'clipboard image'}
-                    style={{ maxWidth: '100%', maxHeight: 160, borderRadius: 8 }}
-                  />
-                ) : item.type === 'file' ? (
-                  <a
-                    href={item.encrypted ? content : fileDownloadUrl(item.fileUrl!, sessionId)}
-                    target="_blank"
-                    rel="noreferrer"
-                    download={item.encrypted ? item.fileName : undefined}
-                    style={{ color: 'var(--accent-2)', wordBreak: 'break-all' }}
-                  >
-                    {item.fileName || 'Download file'}
-                  </a>
-                ) : item.type === 'url' ? (
-                  <a href={content} target="_blank" rel="noreferrer" style={{ color: 'var(--accent-2)', wordBreak: 'break-all' }}>
-                    {content}
-                  </a>
-                ) : looksLikeCode(content) ? (
-                  <SyntaxHighlighter
-                    language={undefined}
-                    style={vs2015}
-                    customStyle={{ margin: 0, borderRadius: 8, fontSize: 13, maxWidth: '100%' }}
-                    wrapLongLines
-                  >
-                    {content}
-                  </SyntaxHighlighter>
-                ) : (
-                  <div style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word', fontSize: 14 }}>{content}</div>
-                )}
-                <div style={{ fontSize: 12, color: 'var(--text-dim)', marginTop: 6 }}>
-                  {item.deviceLabel || 'Device'}
-                  {item.senderSocketId === mySocketId && ' (you)'}
-                  {' · '}
-                  {timeAgo(item.createdAt)}
-                  {item.encrypted && ' · end-to-end encrypted'}
+            <div key={item.id} className="history-item">
+              <div className="history-item__head">
+                <div style={{ fontSize: 12, color: 'var(--text-dim)', display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <span style={{ fontSize: 18 }}>{item.encrypted ? '🔒' : iconFor(item)}</span>
+                  <span>
+                    {item.deviceLabel || 'Device'}
+                    {item.senderSocketId === mySocketId && ' (you)'}
+                    {' · '}
+                    {timeAgo(item.createdAt)}
+                    {item.encrypted && ' · encrypted'}
+                    {isFileLike && !expired && ` · ${expiresIn(item.createdAt)}`}
+                  </span>
+                </div>
+
+                {/* Actions live in the header, so Copy is always visible even for huge text. */}
+                <div className="history-item__actions">
+                  {!expired && (
+                    <button className="btn secondary" style={smallBtn} onClick={() => copyItem(item)}>
+                      {copiedId === item.id ? '✓ Copied' : 'Copy'}
+                    </button>
+                  )}
+                  {isFileLike && !expired && downloadHref && (
+                    <a
+                      className="btn secondary"
+                      style={smallBtn}
+                      href={downloadHref}
+                      download={item.fileName || true}
+                    >
+                      ⬇ Download
+                    </a>
+                  )}
+                  <button className="btn secondary" style={smallBtn} onClick={() => onPin(item.id, !item.pinned)}>
+                    {item.pinned ? '★ Pinned' : '☆ Pin'}
+                  </button>
+                  {user && !item.encrypted && !expired && (
+                    <button className="btn secondary" style={smallBtn} onClick={() => saveToAccount(item)}>
+                      {savedId === item.id ? '✓ Saved' : 'Save'}
+                    </button>
+                  )}
+                  {(isHost || item.senderSocketId === mySocketId) && (
+                    <button className="btn danger" style={smallBtn} onClick={() => onDelete(item.id)}>
+                      Delete
+                    </button>
+                  )}
                 </div>
               </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, position: 'sticky', top: 0, alignSelf: 'flex-start' }}>
-                <button className="btn secondary" style={{ padding: '6px 10px', fontSize: 12 }} onClick={() => copyItem(item)}>
-                  {copiedId === item.id ? '✓ Copied' : 'Copy'}
-                </button>
-                <button className="btn secondary" style={{ padding: '6px 10px', fontSize: 12 }} onClick={() => onPin(item.id, !item.pinned)}>
-                  {item.pinned ? '★ Pinned' : '☆ Pin'}
-                </button>
-                {user && !item.encrypted && (
-                  <button className="btn secondary" style={{ padding: '6px 10px', fontSize: 12 }} onClick={() => saveToAccount(item)}>
-                    {savedId === item.id ? '✓ Saved' : 'Save'}
-                  </button>
-                )}
-                {(isHost || item.senderSocketId === mySocketId) && (
-                  <button className="btn danger" style={{ padding: '6px 10px', fontSize: 12 }} onClick={() => onDelete(item.id)}>
-                    Delete
-                  </button>
-                )}
-              </div>
+
+              {description && (
+                <div
+                  style={{
+                    fontSize: 13,
+                    color: 'var(--text-dim)',
+                    marginBottom: 8,
+                    fontStyle: 'italic',
+                    background: 'var(--panel-2)',
+                    border: '1px solid var(--border)',
+                    borderRadius: 6,
+                    padding: '4px 8px',
+                    display: 'inline-block',
+                    wordBreak: 'break-word',
+                  }}
+                >
+                  📝 {description}
+                </div>
+              )}
+
+              {expired ? (
+                <div style={{ fontSize: 13, color: 'var(--text-dim)' }}>
+                  ⏳ {item.fileName || 'File'} expired — shared files are deleted 24 hours after upload.
+                </div>
+              ) : content === null ? (
+                <div style={{ fontSize: 13, color: 'var(--text-dim)' }}>
+                  {decrypted[item.id] === '__DECRYPT_FAILED__'
+                    ? 'Could not decrypt — this device may not have the session key.'
+                    : 'Decrypting…'}
+                </div>
+              ) : item.type === 'image' ? (
+                <img
+                  src={item.encrypted ? content : fileDownloadUrl(item.fileUrl!, sessionId)}
+                  alt={item.fileName || 'clipboard image'}
+                  style={{ maxWidth: '100%', maxHeight: 220, borderRadius: 8 }}
+                />
+              ) : item.type === 'file' ? (
+                <a
+                  href={item.encrypted ? content : fileDownloadUrl(item.fileUrl!, sessionId)}
+                  target="_blank"
+                  rel="noreferrer"
+                  download={item.encrypted ? item.fileName : undefined}
+                  style={{ color: 'var(--accent-2)', wordBreak: 'break-all' }}
+                >
+                  {item.fileName || 'Open file'}
+                </a>
+              ) : (
+                <>
+                  <div className={`history-item__body${clamped ? ' history-item__body--clamped' : ''}`}>
+                    {item.type === 'url' ? (
+                      <a href={content} target="_blank" rel="noreferrer" style={{ color: 'var(--accent-2)', wordBreak: 'break-all' }}>
+                        {content}
+                      </a>
+                    ) : looksLikeCode(content) ? (
+                      <SyntaxHighlighter
+                        language={undefined}
+                        style={theme === 'light' ? vs : vs2015}
+                        customStyle={{ margin: 0, borderRadius: 8, fontSize: 13, maxWidth: '100%' }}
+                        wrapLongLines
+                      >
+                        {content}
+                      </SyntaxHighlighter>
+                    ) : (
+                      <div style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word', fontSize: 14 }}>{content}</div>
+                    )}
+                  </div>
+                  {long && (
+                    <button
+                      className="link-btn"
+                      onClick={() => setExpanded((prev) => ({ ...prev, [item.id]: !prev[item.id] }))}
+                    >
+                      {expanded[item.id] ? 'Show less ▲' : 'Show more ▼'}
+                    </button>
+                  )}
+                </>
+              )}
             </div>
           );
         })}

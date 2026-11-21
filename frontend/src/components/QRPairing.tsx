@@ -17,6 +17,7 @@ export default function QRPairing({
 }) {
   const [qrDataUrl, setQrDataUrl] = useState('');
   const [keyCopied, setKeyCopied] = useState(false);
+  const [showJoin, setShowJoin] = useState(false);
 
   // Generate the QR client-side so the encryption key (if any) can travel as
   // a URL fragment, which browsers never send in HTTP requests — the server
@@ -35,20 +36,14 @@ export default function QRPairing({
     setTimeout(() => setKeyCopied(false), 1500);
   }
 
-  if (deviceCount >= 2) {
-    return (
-      <div className="card" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-        <span className="dot" />
-        <span>Paired — {deviceCount} devices connected. Copy on one, paste on the other.</span>
-      </div>
-    );
-  }
+  const paired = deviceCount >= 2;
 
-  return (
-    <div className="card" style={{ textAlign: 'center' }}>
-      <h2 style={{ marginTop: 0, fontSize: 18 }}>Waiting for second device…</h2>
-      <p style={{ color: 'var(--text-dim)', fontSize: 14, marginTop: -4 }}>
-        Scan this QR code, or enter the code below on the other device.
+  const pairingBody = (
+    <div style={{ textAlign: 'center' }}>
+      <p style={{ color: 'var(--text-dim)', fontSize: 14, marginTop: 0 }}>
+        {paired
+          ? 'Anyone can join with this QR code or 6-digit code — add as many devices as you need.'
+          : 'Scan this QR code, or enter the code below on the other device.'}
       </p>
       {qrDataUrl && (
         <img
@@ -73,6 +68,31 @@ export default function QRPairing({
           </button>
         </div>
       )}
+    </div>
+  );
+
+  if (!paired) {
+    return (
+      <div className="card">
+        <h2 style={{ marginTop: 0, fontSize: 18, textAlign: 'center' }}>Waiting for second device…</h2>
+        {pairingBody}
+      </div>
+    );
+  }
+
+  // 2+ devices: keep the code + QR reachable so more devices can still join.
+  return (
+    <div className="card">
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <span className="dot" />
+          <span>Paired — {deviceCount} devices connected. Copy on one, paste on the other.</span>
+        </div>
+        <button className="btn secondary" style={{ padding: '6px 12px', fontSize: 13 }} onClick={() => setShowJoin((v) => !v)}>
+          {showJoin ? 'Hide code' : '＋ Add more devices'}
+        </button>
+      </div>
+      {showJoin && <div style={{ marginTop: 16, paddingTop: 16, borderTop: '1px solid var(--border)' }}>{pairingBody}</div>}
     </div>
   );
 }

@@ -147,6 +147,7 @@ export default function ThreeBackground() {
   return (
     <div
       ref={mountRef}
+      className="three-bg"
       aria-hidden="true"
       style={{
         position: 'fixed',
