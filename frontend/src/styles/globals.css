@@ -280,8 +280,6 @@ input:focus, textarea:focus {
   border-radius: 50%;
   border: 1px solid var(--border);
   background: var(--panel);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
   font-size: 20px;
   line-height: 1;
   box-shadow: var(--card-shadow);
@@ -344,8 +342,6 @@ a.btn { display: inline-block; text-decoration: none; text-align: center; }
   z-index: 20;
   border-bottom: 1px solid var(--border);
   background: var(--panel);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
 }
 .lp-nav__inner {
   max-width: 1120px;

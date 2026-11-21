@@ -28,8 +28,8 @@ export default function ThreeBackground() {
     );
     camera.position.z = 9;
 
-    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    const renderer = new THREE.WebGLRenderer({ antialias: false, alpha: true, powerPreference: 'low-power' });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.25));
     renderer.setSize(window.innerWidth, window.innerHeight);
     mount.appendChild(renderer.domElement);
 
@@ -104,7 +104,16 @@ export default function ThreeBackground() {
     let frameId = 0;
     const clock = new THREE.Clock();
 
-    function animate() {
+    // Skip rendering while hidden (light mode) and cap to ~30fps so the
+    // blurred UI layers above the canvas aren't recomposited 60x a second.
+    const FRAME_MS = 1000 / 30;
+    let lastFrame = 0;
+
+    function animate(now = 0) {
+      frameId = requestAnimationFrame(animate);
+      if (document.documentElement.getAttribute('data-theme') === 'light') return;
+      if (now - lastFrame < FRAME_MS) return;
+      lastFrame = now;
       const t = clock.getElapsedTime();
       const speed = prefersReducedMotion ? 0.08 : 1;
 
@@ -125,9 +134,8 @@ export default function ThreeBackground() {
       scene.rotation.y = targetRotation.y;
 
       renderer.render(scene, camera);
-      frameId = requestAnimationFrame(animate);
     }
-    animate();
+    frameId = requestAnimationFrame(animate);
 
     return () => {
       cancelAnimationFrame(frameId);
